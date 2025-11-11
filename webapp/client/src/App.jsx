@@ -1,18 +1,20 @@
+
 import { useState, useEffect } from "react";
 
 function App() {
-  const tg = window.Telegram.WebApp;
+  const tg = window.Telegram?.WebApp; // безопасный доступ
+
   const [service, setService] = useState("");
   const [master, setMaster] = useState("");
   const [date, setDate] = useState("");
 
   useEffect(() => {
-    tg.ready();
-  }, []);
+    tg?.ready(); // вызываем ready один раз
+  }, []); // пустой массив зависимостей
 
   const sendData = () => {
     if (!service || !master || !date) return alert("Заполните все поля!");
-    tg.sendData(JSON.stringify({ service, master, date }));
+    tg?.sendData(JSON.stringify({ service, master, date }));
   };
 
   return (
