@@ -8,8 +8,8 @@ from aiogram.filters import Command
 TOKEN = "8548031527:AAFPbXMfwauEkhElFKKyC_lnzItmuVFPLrc"
 
 # Ссылки на Mini App (ngrok HTTPS или хостинг)
-CLIENT_WEBAPP_URL = "https://manicure-miniapp-huk1.vercel.app"
-MASTER_PANEL_URL = "https://manicure-miniapp-huk1.vercel.app/master"
+CLIENT_WEBAPP_URL = "https://manicure-miniapp.vercel.app"
+MASTER_PANEL_URL = "https://manicure-miniapp.vercel.app//master"
 
 # Инициализация бота и диспетчера
 bot = Bot(token=TOKEN)
