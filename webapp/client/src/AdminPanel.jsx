@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import "./AdminPanel.css";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -16,22 +16,7 @@ function AdminPanel() {
     master: "",
   });
 
-  useEffect(() => {
-    if (tg) {
-      tg.ready();
-      tg.expand();
-      checkAdminStatus();
-    }
-    loadMasters();
-  }, []);
-
-  useEffect(() => {
-    if (isAdmin) {
-      loadSlots();
-    }
-  }, [isAdmin]);
-
-  const checkAdminStatus = async () => {
+  const checkAdminStatus = useCallback(async () => {
     try {
       const userId = tg?.initDataUnsafe?.user?.id || 0;
       const response = await fetch(`${API_URL}/api/admin/check?user_id=${userId}`);
@@ -42,22 +27,22 @@ function AdminPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tg]);
 
-  const loadMasters = async () => {
+  const loadMasters = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/masters`);
       const data = await response.json();
       setMasters(data);
       if (data.length > 0) {
-        setNewSlot({ ...newSlot, master: data[0].name });
+        setNewSlot((prev) => ({ ...prev, master: data[0].name }));
       }
     } catch (error) {
       console.error("Error loading masters:", error);
     }
-  };
+  }, []);
 
-  const loadSlots = async () => {
+  const loadSlots = useCallback(async () => {
     try {
       const userId = tg?.initDataUnsafe?.user?.id || 0;
       const response = await fetch(`${API_URL}/api/admin/slots?user_id=${userId}`);
@@ -68,7 +53,22 @@ function AdminPanel() {
     } catch (error) {
       console.error("Error loading slots:", error);
     }
-  };
+  }, [tg]);
+
+  useEffect(() => {
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      checkAdminStatus();
+    }
+    loadMasters();
+  }, [tg, checkAdminStatus, loadMasters]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadSlots();
+    }
+  }, [isAdmin, loadSlots]);
 
   const handleAddSlot = async () => {
     if (!newSlot.date || !newSlot.time || !newSlot.master) {
@@ -146,17 +146,6 @@ function AdminPanel() {
       }
     }
     return slots;
-  };
-
-  const getAvailableDates = () => {
-    const dates = [];
-    const today = new Date();
-    for (let i = 0; i < 60; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      dates.push(date.toISOString().split("T")[0]);
-    }
-    return dates;
   };
 
   const formatDate = (dateStr) => {

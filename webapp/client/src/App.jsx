@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import "./App.css";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -16,23 +16,7 @@ function App() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (tg) {
-      tg.ready();
-      tg.expand();
-      setPhone(tg.initDataUnsafe?.user?.phone_number || "");
-    }
-    loadServices();
-    loadMasters();
-  }, []);
-
-  useEffect(() => {
-    if (selectedDate && selectedMaster) {
-      loadAvailableSlots();
-    }
-  }, [selectedDate, selectedMaster]);
-
-  const loadServices = async () => {
+  const loadServices = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/services`);
       const data = await response.json();
@@ -40,9 +24,9 @@ function App() {
     } catch (error) {
       console.error("Error loading services:", error);
     }
-  };
+  }, []);
 
-  const loadMasters = async () => {
+  const loadMasters = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/masters`);
       const data = await response.json();
@@ -50,9 +34,10 @@ function App() {
     } catch (error) {
       console.error("Error loading masters:", error);
     }
-  };
+  }, []);
 
-  const loadAvailableSlots = async () => {
+  const loadAvailableSlots = useCallback(async () => {
+    if (!selectedDate || !selectedMaster) return;
     try {
       const response = await fetch(
         `${API_URL}/api/slots?date=${selectedDate}&master=${selectedMaster.name}`
@@ -62,7 +47,23 @@ function App() {
     } catch (error) {
       console.error("Error loading slots:", error);
     }
-  };
+  }, [selectedDate, selectedMaster]);
+
+  useEffect(() => {
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      setPhone(tg.initDataUnsafe?.user?.phone_number || "");
+    }
+    loadServices();
+    loadMasters();
+  }, [tg, loadServices, loadMasters]);
+
+  useEffect(() => {
+    if (selectedDate && selectedMaster) {
+      loadAvailableSlots();
+    }
+  }, [selectedDate, selectedMaster, loadAvailableSlots]);
 
   const handleServiceSelect = (service) => {
     setSelectedService(service);
