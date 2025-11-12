@@ -33,6 +33,16 @@ Thumbs.db
 # Logs
 *.log
 
+# Calendar credentials
+credentials.json
+token.json
+.env
+.env.local
+
+# Excel files
+bookings.xlsx
+*.xlsx
+
 # React build (will be regenerated)
 webapp/client/build/
 webapp/client/node_modules/

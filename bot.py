@@ -198,6 +198,192 @@ async def register_master_command(message: types.Message):
     else:
         await message.answer("❌ Ошибка при регистрации мастера")
 
+# Команда для просмотра записей мастера
+@dp.message(Command("my_bookings"))
+async def my_bookings_command(message: types.Message):
+    """Показать все записи мастера"""
+    user_id = message.from_user.id
+    
+    # Определяем, какой это мастер
+    master_name = None
+    masters = database.get_masters()
+    for master in masters:
+        master_chat_id = database.get_master_chat_id(master[1])
+        if master_chat_id == user_id:
+            master_name = master[1]
+            break
+    
+    if not master_name:
+        await message.answer(
+            "❌ Вы не зарегистрированы как мастер.\n\n"
+            "Используйте команду /register_master <ваше_имя>"
+        )
+        return
+    
+    # Получаем все записи мастера
+    bookings = database.get_master_bookings(master_name)
+    
+    if not bookings:
+        await message.answer(
+            f"📅 У вас пока нет записей, {master_name}.\n\n"
+            "Как только клиенты начнут записываться, записи появятся здесь."
+        )
+        return
+    
+    # Формируем сообщение с записями
+    message_text = f"📋 Ваши записи, {master_name}:\n\n"
+    
+    # Группируем записи по датам
+    bookings_by_date = {}
+    for booking in bookings:
+        date = booking[7]  # booking[7] - это date
+        if date not in bookings_by_date:
+            bookings_by_date[date] = []
+        bookings_by_date[date].append(booking)
+    
+    # Сортируем даты
+    sorted_dates = sorted(bookings_by_date.keys())
+    
+    # Форматируем дату
+    def format_date(date_str):
+        try:
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            months = ["января", "февраля", "марта", "апреля", "мая", "июня",
+                     "июля", "августа", "сентября", "октября", "ноября", "декабря"]
+            days = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+            return f"{days[date_obj.weekday()]}, {date_obj.day} {months[date_obj.month - 1]}"
+        except:
+            return date_str
+    
+    # Формируем сообщение для каждой даты
+    for date in sorted_dates:
+        message_text += f"📅 {format_date(date)}\n"
+        message_text += "─" * 30 + "\n"
+        
+        # Сортируем записи по времени
+        date_bookings = sorted(bookings_by_date[date], key=lambda x: x[8])  # x[8] - это time_slot
+        
+        for booking in date_bookings:
+            # booking структура: (id, user_id, username, first_name, phone, service, master, date, time_slot, confirmed, created_at)
+            time = booking[8]
+            client_name = booking[3] or booking[2] or "Не указано"
+            phone = booking[4] or "Не указан"
+            service = booking[5]
+            
+            message_text += f"⏰ {time} - {service}\n"
+            message_text += f"   👤 {client_name}\n"
+            message_text += f"   📞 {phone}\n"
+            message_text += "\n"
+        
+        message_text += "\n"
+    
+    # Если сообщение слишком длинное, разбиваем на части
+    if len(message_text) > 4000:
+        # Разбиваем на части по 4000 символов
+        parts = []
+        current_part = ""
+        for line in message_text.split('\n'):
+            if len(current_part) + len(line) + 1 > 4000:
+                parts.append(current_part)
+                current_part = line + "\n"
+            else:
+                current_part += line + "\n"
+        if current_part:
+            parts.append(current_part)
+        
+        for i, part in enumerate(parts):
+            if i == 0:
+                await message.answer(part)
+            else:
+                await message.answer(f"📋 Продолжение ({i+1}/{len(parts)}):\n\n{part}")
+    else:
+        await message.answer(message_text)
+
+# Команда для просмотра всех записей (только для админов)
+@dp.message(Command("all_bookings"))
+async def all_bookings_command(message: types.Message):
+    """Показать все записи (только для администраторов)"""
+    user_id = message.from_user.id
+    
+    if not database.is_admin(user_id):
+        await message.answer("❌ У вас нет прав администратора")
+        return
+    
+    # Получаем все записи
+    import sqlite3
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("SELECT * FROM bookings ORDER BY date, time_slot")
+    all_bookings = c.fetchall()
+    conn.close()
+    
+    if not all_bookings:
+        await message.answer("📅 Записей пока нет.")
+        return
+    
+    # Группируем по мастерам
+    bookings_by_master = {}
+    for booking in all_bookings:
+        master = booking[6]  # booking[6] - это master
+        if master not in bookings_by_master:
+            bookings_by_master[master] = []
+        bookings_by_master[master].append(booking)
+    
+    message_text = "📋 Все записи:\n\n"
+    
+    for master_name in sorted(bookings_by_master.keys()):
+        message_text += f"👩‍🎨 {master_name}\n"
+        message_text += "─" * 30 + "\n"
+        
+        # Группируем по датам
+        master_bookings = bookings_by_master[master_name]
+        bookings_by_date = {}
+        for booking in master_bookings:
+            date = booking[7]
+            if date not in bookings_by_date:
+                bookings_by_date[date] = []
+            bookings_by_date[date].append(booking)
+        
+        for date in sorted(bookings_by_date.keys()):
+            try:
+                date_obj = datetime.strptime(date, '%Y-%m-%d')
+                months = ["января", "февраля", "марта", "апреля", "мая", "июня",
+                          "июля", "августа", "сентября", "октября", "ноября", "декабря"]
+                message_text += f"  📅 {date_obj.day} {months[date_obj.month - 1]}\n"
+            except:
+                message_text += f"  📅 {date}\n"
+            
+            date_bookings = sorted(bookings_by_date[date], key=lambda x: x[8])
+            for booking in date_bookings:
+                time = booking[8]
+                client_name = booking[3] or booking[2] or "Не указано"
+                service = booking[5]
+                message_text += f"    ⏰ {time} - {service} ({client_name})\n"
+            message_text += "\n"
+        
+        message_text += "\n"
+    
+    # Разбиваем на части, если слишком длинное
+    if len(message_text) > 4000:
+        parts = []
+        current_part = ""
+        for line in message_text.split('\n'):
+            if len(current_part) + len(line) + 1 > 4000:
+                parts.append(current_part)
+                current_part = line + "\n"
+            else:
+                current_part += line + "\n"
+        if current_part:
+            parts.append(current_part)
+        
+        for i, part in enumerate(parts):
+            if i == 0:
+                await message.answer(part)
+            else:
+                await message.answer(f"📋 Продолжение ({i+1}/{len(parts)}):\n\n{part}")
+    else:
+        await message.answer(message_text)
+
 # Получаем данные из Mini App (клиент)
 @dp.message(lambda message: message.web_app_data is not None)
 async def handle_web_app(message: types.Message):
@@ -247,6 +433,7 @@ async def handle_web_app(message: types.Message):
             except Exception as master_error:
                 print(f"Ошибка отправки сообщения мастеру: {master_error}")
                 # Продолжаем работу даже если не удалось отправить мастеру
+            
         
     except Exception as e:
         await message.answer(f"❌ Произошла ошибка: {str(e)}")
@@ -261,6 +448,15 @@ async def setup_bot_menu():
             BotCommand(command="admin", description="👑 Получить права администратора"),
             BotCommand(command="register_master", description="👩‍🎨 Зарегистрироваться как мастер"),
         ]
+        
+        # Добавляем команды для просмотра записей
+        commands.append(
+            BotCommand(command="my_bookings", description="📋 Мои записи (для мастеров)")
+        )
+        commands.append(
+            BotCommand(command="all_bookings", description="📋 Все записи (для админов)")
+        )
+        
         await bot.set_my_commands(commands)
         
         # Устанавливаем Menu Button для всех пользователей
