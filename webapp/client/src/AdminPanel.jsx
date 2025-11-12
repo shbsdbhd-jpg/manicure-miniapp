@@ -119,14 +119,6 @@ function AdminPanel() {
     return `${date.getDate()} ${months[date.getMonth()]} ${days[date.getDay()]}`;
   };
 
-  if (loading) {
-    return (
-      <div className="admin-container">
-        <div className="loading">Загрузка...</div>
-      </div>
-    );
-  }
-
   if (!isAdmin) {
     return (
       <div className="admin-container">
