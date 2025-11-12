@@ -105,7 +105,7 @@ function AdminPanel() {
   };
 
   const handleDeleteSlot = async (slot) => {
-    if (!confirm(`Удалить слот ${slot.date} ${slot.time} для ${slot.master}?`)) {
+    if (!window.confirm(`Удалить слот ${slot.date} ${slot.time} для ${slot.master}?`)) {
       return;
     }
 
