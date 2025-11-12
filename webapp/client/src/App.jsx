@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import "./App.css";
 
+// ⚠️ ЗАМЕНИТЕ на URL вашего API сервера!
+// Если API на том же домене, что и фронтенд - используйте тот же домен
+// Если API на отдельном сервере - укажите его адрес (например: https://api.ваш-домен.com)
 const API_URL = process.env.REACT_APP_API_URL || "https://manicure-miniapp.vercel.app";
 
 function App() {

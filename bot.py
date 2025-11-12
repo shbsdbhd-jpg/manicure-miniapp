@@ -9,8 +9,9 @@ import database
 TOKEN = "8548031527:AAFPbXMfwauEkhElFKKyC_lnzItmuVFPLrc"
 
 # Ссылки на Mini App (ngrok HTTPS или хостинг)
-CLIENT_WEBAPP_URL = "https://manicure-miniapp.vercel.app"
-ADMIN_PANEL_URL = "https://manicure-miniapp.vercel.app/admin"
+# ⚠️ ЗАМЕНИТЕ на ваш домен!
+CLIENT_WEBAPP_URL = "https://manicure-miniapp.vercel.app"  # URL основного приложения
+ADMIN_PANEL_URL = "https://manicure-miniapp.vercel.app/admin"  # URL админ-панели
 
 # Инициализация бота и диспетчера
 bot = Bot(token=TOKEN)

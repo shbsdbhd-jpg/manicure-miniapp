@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import "./AdminPanel.css";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+// ⚠️ ЗАМЕНИТЕ на URL вашего API сервера!
+// Если API на том же домене, что и фронтенд - используйте тот же домен
+// Если API на отдельном сервере - укажите его адрес (например: https://api.ваш-домен.com)
+const API_URL = process.env.REACT_APP_API_URL || "https://manicure-miniapp.vercel.app";
 
 function AdminPanel() {
   const tg = window.Telegram?.WebApp;
