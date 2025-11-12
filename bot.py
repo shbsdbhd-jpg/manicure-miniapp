@@ -21,6 +21,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Настройка логирования для aiogram (чтобы видеть больше информации)
+aiogram_logger = logging.getLogger('aiogram')
+aiogram_logger.setLevel(logging.INFO)
+
 # Токен твоего бота
 TOKEN = "8548031527:AAFPbXMfwauEkhElFKKyC_lnzItmuVFPLrc"
 
@@ -73,6 +77,7 @@ def create_reply_keyboard(is_admin=False):
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
+    logger.info(f"Команда /start от пользователя {user_id} (@{message.from_user.username or 'без username'})")
     is_admin = database.is_admin(user_id)
     
     # Используем inline кнопки (они всегда работают)
@@ -115,6 +120,10 @@ async def start(message: types.Message):
 @dp.message()
 async def debug_all_messages(message: types.Message):
     """Отладочный обработчик всех сообщений"""
+    # Логируем все входящие сообщения
+    if message.text:
+        logger.debug(f"Получено текстовое сообщение от {message.from_user.id}: {message.text[:50]}...")
+    
     # Логируем все сообщения для отладки
     if message.web_app_data:
         logger.debug(f"🔍 ОТЛАДКА: Найдено web_app_data!")
@@ -177,6 +186,7 @@ async def handle_any_message_text(message: types.Message):
 # Команда /admin для добавления админа
 @dp.message(Command("admin"))
 async def add_admin_command(message: types.Message):
+    logger.info(f"Команда /admin от пользователя {message.from_user.id}")
     # Здесь можно добавить проверку на суперадмина или использовать переменную окружения
     # Для простоты, первый пользователь, который использует команду, станет админом
     user_id = message.from_user.id
@@ -193,6 +203,7 @@ async def add_admin_command(message: types.Message):
 # Команда для регистрации мастера
 @dp.message(Command("register_master"))
 async def register_master_command(message: types.Message):
+    logger.info(f"Команда /register_master от пользователя {message.from_user.id}")
     """Мастер может зарегистрировать себя, указав свое имя"""
     text = message.text.split()
     if len(text) < 2:
@@ -233,6 +244,7 @@ async def register_master_command(message: types.Message):
 # Команда для просмотра записей мастера
 @dp.message(Command("my_bookings"))
 async def my_bookings_command(message: types.Message):
+    logger.info(f"Команда /my_bookings от пользователя {message.from_user.id}")
     """Показать все записи мастера"""
     user_id = message.from_user.id
     
