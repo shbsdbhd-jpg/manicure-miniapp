@@ -4,8 +4,7 @@ import { MASTERS, getSlotsFromStorage, saveSlotsToStorage, initSlotsIfNeeded } f
 
 function AdminPanel() {
   const tg = window.Telegram?.WebApp;
-  const [isAdmin, setIsAdmin] = useState(true); // Упрощенная версия - все админы
-  const [loading, setLoading] = useState(false);
+  const isAdmin = true; // Упрощенная версия - все админы
   const [slots, setSlots] = useState([]);
   const [masters] = useState(MASTERS);
   const [showAddForm, setShowAddForm] = useState(false);

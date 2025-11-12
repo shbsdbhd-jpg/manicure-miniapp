@@ -7,7 +7,6 @@ function App() {
   const [step, setStep] = useState(1);
   const [services] = useState(SERVICES);
   const [masters] = useState(MASTERS);
-  const [allSlots, setAllSlots] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedMaster, setSelectedMaster] = useState(null);
   const [selectedDate, setSelectedDate] = useState("");
@@ -15,12 +14,10 @@ function App() {
   const [selectedTime, setSelectedTime] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(false);
 
   // Инициализация слотов из localStorage
   useEffect(() => {
-    const slots = initSlotsIfNeeded();
-    setAllSlots(slots);
+    initSlotsIfNeeded();
   }, []);
 
   // Загрузка доступных слотов для выбранной даты и мастера
@@ -101,7 +98,6 @@ function App() {
       if (slotIndex !== -1) {
         slots[slotIndex].is_available = false;
         saveSlotsToStorage(slots);
-        setAllSlots(slots);
       }
 
       // Отправляем данные в Telegram
