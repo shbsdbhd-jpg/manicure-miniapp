@@ -300,25 +300,37 @@ async def my_bookings_command(message: types.Message):
         await message.answer(message_text)
 
 # Команда для просмотра всех записей (только для админов)
-@dp.message(Command("all_bookings"))
+@dp.message(Command("all_bookings", "allbookings"))
 async def all_bookings_command(message: types.Message):
     """Показать все записи (только для администраторов)"""
     user_id = message.from_user.id
     
+    print(f"Команда /all_bookings от пользователя {user_id}")
+    
     if not database.is_admin(user_id):
-        await message.answer("❌ У вас нет прав администратора")
+        await message.answer("❌ У вас нет прав администратора.\n\nИспользуйте команду /admin для получения прав.")
+        print(f"Пользователь {user_id} не является администратором")
         return
+    
+    print(f"Пользователь {user_id} является администратором, получаю записи...")
     
     # Получаем все записи
     import sqlite3
-    conn = sqlite3.connect("database.db")
-    c = conn.cursor()
-    c.execute("SELECT * FROM bookings ORDER BY date, time_slot")
-    all_bookings = c.fetchall()
-    conn.close()
-    
-    if not all_bookings:
-        await message.answer("📅 Записей пока нет.")
+    try:
+        conn = sqlite3.connect("database.db")
+        c = conn.cursor()
+        c.execute("SELECT * FROM bookings ORDER BY date, time_slot")
+        all_bookings = c.fetchall()
+        conn.close()
+        
+        print(f"Найдено записей: {len(all_bookings)}")
+        
+        if not all_bookings:
+            await message.answer("📅 Записей пока нет.\n\nКак только клиенты начнут записываться, записи появятся здесь.")
+            return
+    except Exception as db_error:
+        print(f"Ошибка при получении записей из базы: {db_error}")
+        await message.answer(f"❌ Ошибка при получении записей: {str(db_error)}")
         return
     
     # Группируем по мастерам
@@ -364,25 +376,32 @@ async def all_bookings_command(message: types.Message):
         message_text += "\n"
     
     # Разбиваем на части, если слишком длинное
-    if len(message_text) > 4000:
-        parts = []
-        current_part = ""
-        for line in message_text.split('\n'):
-            if len(current_part) + len(line) + 1 > 4000:
+    try:
+        if len(message_text) > 4000:
+            parts = []
+            current_part = ""
+            for line in message_text.split('\n'):
+                if len(current_part) + len(line) + 1 > 4000:
+                    parts.append(current_part)
+                    current_part = line + "\n"
+                else:
+                    current_part += line + "\n"
+            if current_part:
                 parts.append(current_part)
-                current_part = line + "\n"
-            else:
-                current_part += line + "\n"
-        if current_part:
-            parts.append(current_part)
-        
-        for i, part in enumerate(parts):
-            if i == 0:
-                await message.answer(part)
-            else:
-                await message.answer(f"📋 Продолжение ({i+1}/{len(parts)}):\n\n{part}")
-    else:
-        await message.answer(message_text)
+            
+            print(f"Сообщение разбито на {len(parts)} частей")
+            
+            for i, part in enumerate(parts):
+                if i == 0:
+                    await message.answer(part)
+                else:
+                    await message.answer(f"📋 Продолжение ({i+1}/{len(parts)}):\n\n{part}")
+        else:
+            print(f"Отправляю сообщение длиной {len(message_text)} символов")
+            await message.answer(message_text)
+    except Exception as send_error:
+        print(f"Ошибка при отправке сообщения: {send_error}")
+        await message.answer(f"❌ Ошибка при отправке записей: {str(send_error)}")
 
 # Получаем данные из Mini App (клиент)
 @dp.message(lambda message: message.web_app_data is not None)
