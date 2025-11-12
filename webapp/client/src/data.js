@@ -43,21 +43,19 @@ export const generateDefaultSlots = () => {
     date.setDate(today.getDate() + i);
     const dateStr = date.toISOString().split('T')[0];
     
-    // Время работы: 9:00 - 20:00, каждые 30 минут
-    for (let hour = 9; hour < 21; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        
-        // Добавляем слот для каждого мастера
-        masters.forEach(master => {
-          slots.push({
-            date: dateStr,
-            time: timeStr,
-            master: master,
-            is_available: true
-          });
+    // Время работы: 10:00 - 22:00 (10 PM), каждые 2 часа
+    for (let hour = 10; hour <= 22; hour += 2) {
+      const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+      
+      // Добавляем слот для каждого мастера
+      masters.forEach(master => {
+        slots.push({
+          date: dateStr,
+          time: timeStr,
+          master: master,
+          is_available: true
         });
-      }
+      });
     }
   }
   
