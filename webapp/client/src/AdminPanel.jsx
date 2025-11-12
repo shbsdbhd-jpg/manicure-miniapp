@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import "./AdminPanel.css";
-import { MASTERS, getSlotsFromStorage, saveSlotsToStorage, initSlotsIfNeeded } from "./data";
+import { MASTERS, getSlotsFromStorage, saveSlotsToStorage, initSlotsIfNeeded, getBookingsFromStorage } from "./data";
 
 function AdminPanel() {
   const tg = window.Telegram?.WebApp;
@@ -8,6 +8,8 @@ function AdminPanel() {
   const [slots, setSlots] = useState([]);
   const [masters] = useState(MASTERS);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showBookings, setShowBookings] = useState(false);
+  const [bookings, setBookings] = useState([]);
   const [newSlot, setNewSlot] = useState({
     date: "",
     time: "",
@@ -17,6 +19,17 @@ function AdminPanel() {
   const loadSlots = useCallback(() => {
     const allSlots = getSlotsFromStorage();
     setSlots(allSlots.filter(slot => slot.is_available));
+  }, []);
+
+  const loadBookings = useCallback(() => {
+    const allBookings = getBookingsFromStorage();
+    // Сортируем по дате и времени
+    const sorted = allBookings.sort((a, b) => {
+      const dateA = new Date(`${a.date}T${a.time_slot}`);
+      const dateB = new Date(`${b.date}T${b.time_slot}`);
+      return dateA - dateB;
+    });
+    setBookings(sorted);
   }, []);
 
   useEffect(() => {
@@ -30,7 +43,8 @@ function AdminPanel() {
       setNewSlot((prev) => ({ ...prev, master: masters[0].name }));
     }
     loadSlots();
-  }, [tg, masters, loadSlots]);
+    loadBookings();
+  }, [tg, masters, loadSlots, loadBookings]);
 
   const handleAddSlot = () => {
     if (!newSlot.date || !newSlot.time || !newSlot.master) {
@@ -137,12 +151,27 @@ function AdminPanel() {
     <div className="admin-container">
       <div className="admin-header">
         <h1>⚙️ Админ-панель</h1>
-        <button
-          className="btn-add"
-          onClick={() => setShowAddForm(!showAddForm)}
-        >
-          {showAddForm ? "✕ Отмена" : "+ Добавить слот"}
-        </button>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            className="btn-add"
+            onClick={() => {
+              setShowBookings(!showBookings);
+              setShowAddForm(false);
+              if (!showBookings) loadBookings();
+            }}
+          >
+            {showBookings ? "✕ Закрыть" : "📋 Записи"}
+          </button>
+          <button
+            className="btn-add"
+            onClick={() => {
+              setShowAddForm(!showAddForm);
+              setShowBookings(false);
+            }}
+          >
+            {showAddForm ? "✕ Отмена" : "+ Добавить слот"}
+          </button>
+        </div>
       </div>
 
       {showAddForm && (
@@ -193,6 +222,66 @@ function AdminPanel() {
           <button className="btn-primary" onClick={handleAddSlot}>
             Добавить
           </button>
+        </div>
+      )}
+
+      {showBookings && (
+        <div className="bookings-list" style={{ marginBottom: "30px" }}>
+          <h2>📋 Все записи клиентов</h2>
+          {bookings.length === 0 ? (
+            <div className="empty-state">
+              <p>Нет записей</p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {bookings.map((booking) => (
+                <div
+                  key={booking.id}
+                  style={{
+                    background: "linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)",
+                    borderRadius: "16px",
+                    padding: "16px",
+                    border: "2px solid #e9ecef",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "8px" }}>
+                    <div>
+                      <div style={{ fontWeight: "700", fontSize: "16px", color: "#2d3748", marginBottom: "4px" }}>
+                        {booking.first_name || booking.username || "Клиент"}
+                      </div>
+                      <div style={{ fontSize: "14px", color: "#718096" }}>
+                        {booking.phone || "Телефон не указан"}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "12px", color: "#718096" }}>
+                        {new Date(booking.created_at).toLocaleDateString("ru-RU")}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #e9ecef" }}>
+                    <div>
+                      <div style={{ fontSize: "12px", color: "#718096", marginBottom: "4px" }}>Услуга</div>
+                      <div style={{ fontWeight: "600", color: "#2d3748" }}>{booking.service}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "12px", color: "#718096", marginBottom: "4px" }}>Мастер</div>
+                      <div style={{ fontWeight: "600", color: "#2d3748" }}>{booking.master}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "12px", color: "#718096", marginBottom: "4px" }}>Дата</div>
+                      <div style={{ fontWeight: "600", color: "#2d3748" }}>{formatDate(booking.date)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "12px", color: "#718096", marginBottom: "4px" }}>Время</div>
+                      <div style={{ fontWeight: "600", color: "#2d3748" }}>{booking.time_slot}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

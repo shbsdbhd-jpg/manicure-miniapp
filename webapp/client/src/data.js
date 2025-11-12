@@ -75,3 +75,31 @@ export const initSlotsIfNeeded = () => {
   return slots;
 };
 
+// Функции для работы с записями (bookings)
+export const getBookingsFromStorage = () => {
+  try {
+    const bookings = localStorage.getItem('bookings');
+    return bookings ? JSON.parse(bookings) : [];
+  } catch (error) {
+    console.error('Error reading bookings from storage:', error);
+    return [];
+  }
+};
+
+export const saveBookingToStorage = (booking) => {
+  try {
+    const bookings = getBookingsFromStorage();
+    const newBooking = {
+      ...booking,
+      id: Date.now(), // Простой ID на основе времени
+      created_at: new Date().toISOString()
+    };
+    bookings.push(newBooking);
+    localStorage.setItem('bookings', JSON.stringify(bookings));
+    return newBooking;
+  } catch (error) {
+    console.error('Error saving booking to storage:', error);
+    return null;
+  }
+};
+

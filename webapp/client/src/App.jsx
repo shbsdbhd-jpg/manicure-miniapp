@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import "./App.css";
-import { SERVICES, MASTERS, initSlotsIfNeeded, getSlotsFromStorage, saveSlotsToStorage } from "./data";
+import { SERVICES, MASTERS, initSlotsIfNeeded, getSlotsFromStorage, saveSlotsToStorage, saveBookingToStorage } from "./data";
 
 function App() {
   const tg = window.Telegram?.WebApp;
@@ -100,7 +100,7 @@ function App() {
         saveSlotsToStorage(slots);
       }
 
-      // Отправляем данные в Telegram
+      // Сохраняем запись в localStorage
       const bookingData = {
         type: "booking",
         service: selectedService.name,
@@ -108,7 +108,12 @@ function App() {
         date: selectedDate,
         time_slot: selectedTime,
         phone: phone,
+        user_id: tg?.initDataUnsafe?.user?.id || 0,
+        username: tg?.initDataUnsafe?.user?.username || "",
+        first_name: tg?.initDataUnsafe?.user?.first_name || "",
       };
+      
+      saveBookingToStorage(bookingData);
 
       try {
         if (tg && tg.sendData) {
