@@ -18,14 +18,27 @@ function App() {
   const [selectedTime, setSelectedTime] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
+  const [error, setError] = useState(null);
 
   const loadServices = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/api/services`);
+      setError(null);
+      const url = `${API_URL}/api/services`;
+      console.log("Loading services from:", url);
+      const response = await fetch(url);
+      console.log("Response status:", response.status);
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
       const data = await response.json();
+      console.log("Services loaded:", data);
       setServices(data);
     } catch (error) {
       console.error("Error loading services:", error);
+      setError(`Ошибка загрузки услуг: ${error.message}`);
+    } finally {
+      setLoadingData(false);
     }
   }, []);
 
@@ -58,6 +71,7 @@ function App() {
       tg.expand();
       setPhone(tg.initDataUnsafe?.user?.phone_number || "");
     }
+    setLoadingData(true);
     loadServices();
     loadMasters();
   }, [tg, loadServices, loadMasters]);
@@ -231,21 +245,44 @@ function App() {
       {step === 1 && (
         <div className="step-container">
           <h2>Выберите услугу</h2>
-          <div className="service-grid">
-            {services.map((service) => (
-              <div
-                key={service.id}
-                className="service-card"
-                onClick={() => handleServiceSelect(service)}
-              >
-                <div className="service-name">{service.name}</div>
-                <div className="service-duration">
-                  ⏱️ {service.duration} мин
-                </div>
-                <div className="service-price">{service.price} ₽</div>
+          {loadingData ? (
+            <div style={{ textAlign: "center", padding: "40px" }}>
+              <div style={{ fontSize: "24px", marginBottom: "10px" }}>⏳</div>
+              <div>Загрузка услуг...</div>
+            </div>
+          ) : error ? (
+            <div style={{ textAlign: "center", padding: "40px", color: "#e74c3c" }}>
+              <div style={{ fontSize: "24px", marginBottom: "10px" }}>❌</div>
+              <div>{error}</div>
+              <div style={{ marginTop: "20px", fontSize: "14px", color: "#666" }}>
+                Проверьте, что API сервер запущен и доступен по адресу: {API_URL}
               </div>
-            ))}
-          </div>
+            </div>
+          ) : services.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px" }}>
+              <div style={{ fontSize: "24px", marginBottom: "10px" }}>📭</div>
+              <div>Нет доступных услуг</div>
+              <div style={{ marginTop: "20px", fontSize: "14px", color: "#666" }}>
+                Убедитесь, что API сервер работает и данные загружены
+              </div>
+            </div>
+          ) : (
+            <div className="service-grid">
+              {services.map((service) => (
+                <div
+                  key={service.id}
+                  className="service-card"
+                  onClick={() => handleServiceSelect(service)}
+                >
+                  <div className="service-name">{service.name}</div>
+                  <div className="service-duration">
+                    ⏱️ {service.duration} мин
+                  </div>
+                  <div className="service-price">{service.price} ₽</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
