@@ -446,20 +446,37 @@ async def all_bookings_command(message: types.Message):
 @dp.message(lambda message: message.web_app_data is not None)
 async def handle_web_app(message: types.Message):
     try:
+        print(f"📨 Получены данные из Mini App от пользователя {message.from_user.id}")
+        print(f"Имя: {message.from_user.first_name}, Username: {message.from_user.username}")
+        print(f"Данные: {message.web_app_data.data}")
+        
         data = json.loads(message.web_app_data.data)
+        print(f"Распарсенные данные: {data}")
         
         if data.get('type') == 'booking':
+            print(f"📝 Создаю запись в базе данных...")
+            print(f"Мастер: {data.get('master')}, Дата: {data.get('date')}, Время: {data.get('time_slot')}")
+            
             # Создание записи
-            booking_id = database.add_booking(
-                user_id=message.from_user.id,
-                username=message.from_user.username or "",
-                first_name=message.from_user.first_name or "",
-                phone=data.get('phone', ''),
-                service=data['service'],
-                master=data['master'],
-                date=data['date'],
-                time_slot=data['time_slot']
-            )
+            try:
+                booking_id = database.add_booking(
+                    user_id=message.from_user.id,
+                    username=message.from_user.username or "",
+                    first_name=message.from_user.first_name or "",
+                    phone=data.get('phone', ''),
+                    service=data['service'],
+                    master=data['master'],
+                    date=data['date'],
+                    time_slot=data['time_slot']
+                )
+                print(f"✅ Запись успешно сохранена в базу данных с ID: {booking_id}")
+                print(f"Теперь в базе есть запись для мастера '{data['master']}' на {data['date']} в {data['time_slot']}")
+            except Exception as booking_error:
+                print(f"❌ Ошибка при сохранении записи: {booking_error}")
+                import traceback
+                traceback.print_exc()
+                await message.answer(f"❌ Ошибка при сохранении записи: {str(booking_error)}")
+                return
             
             # Отправляем подтверждение клиенту
             await message.answer(
