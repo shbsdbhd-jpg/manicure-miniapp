@@ -1,17 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import "./AdminPanel.css";
-
-// ⚠️ ЗАМЕНИТЕ на URL вашего API сервера!
-// Если API на том же домене, что и фронтенд - используйте тот же домен
-// Если API на отдельном сервере - укажите его адрес (например: https://api.ваш-домен.com)
-const API_URL = process.env.REACT_APP_API_URL || "https://manicure-miniapp.vercel.app";
+import { MASTERS, getSlotsFromStorage, saveSlotsToStorage, initSlotsIfNeeded } from "./data";
 
 function AdminPanel() {
   const tg = window.Telegram?.WebApp;
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(true); // Упрощенная версия - все админы
+  const [loading, setLoading] = useState(false);
   const [slots, setSlots] = useState([]);
-  const [masters, setMasters] = useState([]);
+  const [masters] = useState(MASTERS);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newSlot, setNewSlot] = useState({
     date: "",
@@ -19,124 +15,77 @@ function AdminPanel() {
     master: "",
   });
 
-  const checkAdminStatus = useCallback(async () => {
-    try {
-      const userId = tg?.initDataUnsafe?.user?.id || 0;
-      const response = await fetch(`${API_URL}/api/admin/check?user_id=${userId}`);
-      const data = await response.json();
-      setIsAdmin(data.is_admin);
-    } catch (error) {
-      console.error("Error checking admin status:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [tg]);
-
-  const loadMasters = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/masters`);
-      const data = await response.json();
-      setMasters(data);
-      if (data.length > 0) {
-        setNewSlot((prev) => ({ ...prev, master: data[0].name }));
-      }
-    } catch (error) {
-      console.error("Error loading masters:", error);
-    }
+  const loadSlots = useCallback(() => {
+    const allSlots = getSlotsFromStorage();
+    setSlots(allSlots.filter(slot => slot.is_available));
   }, []);
-
-  const loadSlots = useCallback(async () => {
-    try {
-      const userId = tg?.initDataUnsafe?.user?.id || 0;
-      const response = await fetch(`${API_URL}/api/admin/slots?user_id=${userId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSlots(data);
-      }
-    } catch (error) {
-      console.error("Error loading slots:", error);
-    }
-  }, [tg]);
 
   useEffect(() => {
     if (tg) {
       tg.ready();
       tg.expand();
-      checkAdminStatus();
     }
-    loadMasters();
-  }, [tg, checkAdminStatus, loadMasters]);
-
-  useEffect(() => {
-    if (isAdmin) {
-      loadSlots();
+    // Инициализируем слоты если нужно
+    initSlotsIfNeeded();
+    if (masters.length > 0) {
+      setNewSlot((prev) => ({ ...prev, master: masters[0].name }));
     }
-  }, [isAdmin, loadSlots]);
+    loadSlots();
+  }, [tg, masters, loadSlots]);
 
-  const handleAddSlot = async () => {
+  const handleAddSlot = () => {
     if (!newSlot.date || !newSlot.time || !newSlot.master) {
-      alert("Заполните все поля");
+      window.alert("Заполните все поля");
       return;
     }
 
     try {
-      const userId = tg?.initDataUnsafe?.user?.id || 0;
-      const response = await fetch(`${API_URL}/api/admin/slots`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          ...newSlot,
-        }),
-      });
+      const slots = getSlotsFromStorage();
+      
+      // Проверяем, существует ли уже такой слот
+      const exists = slots.some(slot => 
+        slot.date === newSlot.date && 
+        slot.time === newSlot.time && 
+        slot.master === newSlot.master
+      );
 
-      if (response.ok) {
+      if (!exists) {
+        slots.push({
+          date: newSlot.date,
+          time: newSlot.time,
+          master: newSlot.master,
+          is_available: true
+        });
+        saveSlotsToStorage(slots);
         setNewSlot({ date: "", time: "", master: masters[0]?.name || "" });
         setShowAddForm(false);
         loadSlots();
-        alert("Слот успешно добавлен!");
+        window.alert("Слот успешно добавлен!");
       } else {
-        const error = await response.json();
-        alert(`Ошибка: ${error.error || "Не удалось добавить слот"}`);
+        window.alert("Такой слот уже существует");
       }
     } catch (error) {
       console.error("Error adding slot:", error);
-      alert("Произошла ошибка при добавлении слота");
+      window.alert("Произошла ошибка при добавлении слота");
     }
   };
 
-  const handleDeleteSlot = async (slot) => {
+  const handleDeleteSlot = (slot) => {
     if (!window.confirm(`Удалить слот ${slot.date} ${slot.time} для ${slot.master}?`)) {
       return;
     }
 
     try {
-      const userId = tg?.initDataUnsafe?.user?.id || 0;
-      const response = await fetch(`${API_URL}/api/admin/slots`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          date: slot.date,
-          time: slot.time,
-          master: slot.master,
-        }),
-      });
-
-      if (response.ok) {
-        loadSlots();
-        alert("Слот успешно удален!");
-      } else {
-        const error = await response.json();
-        alert(`Ошибка: ${error.error || "Не удалось удалить слот"}`);
-      }
+      const slots = getSlotsFromStorage();
+      const filtered = slots.filter(s => 
+        !(s.date === slot.date && s.time === slot.time && s.master === slot.master)
+      );
+      saveSlotsToStorage(filtered);
+      loadSlots();
+      window.alert("Слот успешно удален!");
     } catch (error) {
       console.error("Error deleting slot:", error);
-      alert("Произошла ошибка при удалении слота");
+      window.alert("Произошла ошибка при удалении слота");
     }
   };
 

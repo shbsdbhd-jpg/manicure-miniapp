@@ -1,16 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import "./App.css";
-
-// ⚠️ ЗАМЕНИТЕ на URL вашего API сервера!
-// Если API на том же домене, что и фронтенд - используйте тот же домен
-// Если API на отдельном сервере - укажите его адрес (например: https://api.ваш-домен.com)
-const API_URL = process.env.REACT_APP_API_URL || "https://manicure-miniapp.vercel.app";
+import { SERVICES, MASTERS, initSlotsIfNeeded, getSlotsFromStorage, saveSlotsToStorage } from "./data";
 
 function App() {
   const tg = window.Telegram?.WebApp;
   const [step, setStep] = useState(1);
-  const [services, setServices] = useState([]);
-  const [masters, setMasters] = useState([]);
+  const [services] = useState(SERVICES);
+  const [masters] = useState(MASTERS);
+  const [allSlots, setAllSlots] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedMaster, setSelectedMaster] = useState(null);
   const [selectedDate, setSelectedDate] = useState("");
@@ -18,51 +15,32 @@ function App() {
   const [selectedTime, setSelectedTime] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(true);
-  const [error, setError] = useState(null);
+  const [loadingData, setLoadingData] = useState(false);
 
-  const loadServices = useCallback(async () => {
-    try {
-      setError(null);
-      const url = `${API_URL}/api/services`;
-      console.log("Loading services from:", url);
-      const response = await fetch(url);
-      console.log("Response status:", response.status);
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
-      }
-      const data = await response.json();
-      console.log("Services loaded:", data);
-      setServices(data);
-    } catch (error) {
-      console.error("Error loading services:", error);
-      setError(`Ошибка загрузки услуг: ${error.message}`);
-    } finally {
-      setLoadingData(false);
-    }
+  // Инициализация слотов из localStorage
+  useEffect(() => {
+    const slots = initSlotsIfNeeded();
+    setAllSlots(slots);
   }, []);
 
-  const loadMasters = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/masters`);
-      const data = await response.json();
-      setMasters(data);
-    } catch (error) {
-      console.error("Error loading masters:", error);
+  // Загрузка доступных слотов для выбранной даты и мастера
+  const loadAvailableSlots = useCallback(() => {
+    if (!selectedDate || !selectedMaster) {
+      setAvailableSlots([]);
+      return;
     }
-  }, []);
-
-  const loadAvailableSlots = useCallback(async () => {
-    if (!selectedDate || !selectedMaster) return;
-    try {
-      const response = await fetch(
-        `${API_URL}/api/slots?date=${selectedDate}&master=${selectedMaster.name}`
-      );
-      const data = await response.json();
-      setAvailableSlots(data);
-    } catch (error) {
-      console.error("Error loading slots:", error);
-    }
+    
+    const slots = getSlotsFromStorage();
+    const filtered = slots
+      .filter(slot => 
+        slot.date === selectedDate && 
+        slot.master === selectedMaster.name && 
+        slot.is_available
+      )
+      .map(slot => slot.time)
+      .sort();
+    
+    setAvailableSlots([...new Set(filtered)]); // Убираем дубликаты
   }, [selectedDate, selectedMaster]);
 
   useEffect(() => {
@@ -71,10 +49,7 @@ function App() {
       tg.expand();
       setPhone(tg.initDataUnsafe?.user?.phone_number || "");
     }
-    setLoadingData(true);
-    loadServices();
-    loadMasters();
-  }, [tg, loadServices, loadMasters]);
+  }, [tg]);
 
   useEffect(() => {
     if (selectedDate && selectedMaster) {
@@ -115,51 +90,42 @@ function App() {
 
     setLoading(true);
     try {
-      // Сначала отправляем в API
-      const response = await fetch(`${API_URL}/api/bookings`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: tg?.initDataUnsafe?.user?.id || 0,
-          username: tg?.initDataUnsafe?.user?.username || "",
-          first_name: tg?.initDataUnsafe?.user?.first_name || "",
-          phone: phone,
-          service: selectedService.name,
-          master: selectedMaster.name,
-          date: selectedDate,
-          time_slot: selectedTime,
-        }),
-      });
-
-      if (response.ok) {
-        // Затем отправляем в Telegram
-        const bookingData = {
-          type: "booking",
-          service: selectedService.name,
-          master: selectedMaster.name,
-          date: selectedDate,
-          time_slot: selectedTime,
-          phone: phone,
-        };
-
-        try {
-          if (tg && tg.sendData) {
-            tg.sendData(JSON.stringify(bookingData));
-          } else {
-            console.warn("Telegram WebApp API not available");
-          }
-        } catch (telegramError) {
-          console.error("Error sending data to Telegram:", telegramError);
-          // Продолжаем даже если не удалось отправить в Telegram
-        }
-
-        setStep(6); // Шаг успешной записи
-      } else {
-        const error = await response.json();
-        window.alert(`Ошибка: ${error.error || "Не удалось создать запись"}`);
+      // Помечаем слот как занятый в localStorage
+      const slots = getSlotsFromStorage();
+      const slotIndex = slots.findIndex(slot => 
+        slot.date === selectedDate && 
+        slot.time === selectedTime && 
+        slot.master === selectedMaster.name
+      );
+      
+      if (slotIndex !== -1) {
+        slots[slotIndex].is_available = false;
+        saveSlotsToStorage(slots);
+        setAllSlots(slots);
       }
+
+      // Отправляем данные в Telegram
+      const bookingData = {
+        type: "booking",
+        service: selectedService.name,
+        master: selectedMaster.name,
+        date: selectedDate,
+        time_slot: selectedTime,
+        phone: phone,
+      };
+
+      try {
+        if (tg && tg.sendData) {
+          tg.sendData(JSON.stringify(bookingData));
+        } else {
+          console.warn("Telegram WebApp API not available");
+        }
+      } catch (telegramError) {
+        console.error("Error sending data to Telegram:", telegramError);
+        window.alert("Ошибка отправки в Telegram. Запись сохранена локально.");
+      }
+
+      setStep(6); // Шаг успешной записи
     } catch (error) {
       console.error("Error creating booking:", error);
       window.alert("Произошла ошибка при создании записи. Попробуйте еще раз.");
@@ -245,44 +211,21 @@ function App() {
       {step === 1 && (
         <div className="step-container">
           <h2>Выберите услугу</h2>
-          {loadingData ? (
-            <div style={{ textAlign: "center", padding: "40px" }}>
-              <div style={{ fontSize: "24px", marginBottom: "10px" }}>⏳</div>
-              <div>Загрузка услуг...</div>
-            </div>
-          ) : error ? (
-            <div style={{ textAlign: "center", padding: "40px", color: "#e74c3c" }}>
-              <div style={{ fontSize: "24px", marginBottom: "10px" }}>❌</div>
-              <div>{error}</div>
-              <div style={{ marginTop: "20px", fontSize: "14px", color: "#666" }}>
-                Проверьте, что API сервер запущен и доступен по адресу: {API_URL}
-              </div>
-            </div>
-          ) : services.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px" }}>
-              <div style={{ fontSize: "24px", marginBottom: "10px" }}>📭</div>
-              <div>Нет доступных услуг</div>
-              <div style={{ marginTop: "20px", fontSize: "14px", color: "#666" }}>
-                Убедитесь, что API сервер работает и данные загружены
-              </div>
-            </div>
-          ) : (
-            <div className="service-grid">
-              {services.map((service) => (
-                <div
-                  key={service.id}
-                  className="service-card"
-                  onClick={() => handleServiceSelect(service)}
-                >
-                  <div className="service-name">{service.name}</div>
-                  <div className="service-duration">
-                    ⏱️ {service.duration} мин
-                  </div>
-                  <div className="service-price">{service.price} ₽</div>
+          <div className="service-grid">
+            {services.map((service) => (
+              <div
+                key={service.id}
+                className="service-card"
+                onClick={() => handleServiceSelect(service)}
+              >
+                <div className="service-name">{service.name}</div>
+                <div className="service-duration">
+                  ⏱️ {service.duration} мин
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="service-price">{service.price} ₽</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
