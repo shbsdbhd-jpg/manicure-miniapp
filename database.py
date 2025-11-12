@@ -219,3 +219,21 @@ def get_masters():
     masters = c.fetchall()
     conn.close()
     return masters
+
+def get_master_chat_id(master_name):
+    """Получить chat_id мастера по имени"""
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("SELECT chat_id FROM masters WHERE name = ?", (master_name,))
+    result = c.fetchone()
+    conn.close()
+    return result[0] if result else None
+
+def set_master_chat_id(master_name, chat_id):
+    """Установить chat_id для мастера"""
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("UPDATE masters SET chat_id = ? WHERE name = ?", (chat_id, master_name))
+    conn.commit()
+    conn.close()
+    return c.rowcount > 0
