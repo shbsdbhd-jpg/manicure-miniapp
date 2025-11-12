@@ -136,14 +136,95 @@ function App() {
   };
 
   const getAvailableDates = () => {
-    const dates = [];
+    if (!selectedMaster) return [];
+    
+    const slots = getSlotsFromStorage();
+    const availableDatesSet = new Set();
     const today = new Date();
-    for (let i = 0; i < 30; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      dates.push(date.toISOString().split("T")[0]);
+    today.setHours(0, 0, 0, 0);
+    
+    // Вычисляем дату через месяц
+    const oneMonthLater = new Date(today);
+    oneMonthLater.setMonth(today.getMonth() + 1);
+    
+    // Находим все даты, где есть доступные слоты для выбранного мастера
+    // и которые находятся в пределах месяца от сегодня
+    slots.forEach(slot => {
+      if (slot.master === selectedMaster.name && slot.is_available) {
+        const slotDate = new Date(slot.date);
+        slotDate.setHours(0, 0, 0, 0);
+        
+        // Проверяем, что дата не в прошлом и не более чем через месяц
+        if (slotDate >= today && slotDate <= oneMonthLater) {
+          availableDatesSet.add(slot.date);
+        }
+      }
+    });
+    
+    return Array.from(availableDatesSet).sort();
+  };
+
+  const getCalendarDays = () => {
+    const availableDates = getAvailableDates();
+    if (availableDates.length === 0) return [];
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Вычисляем дату через месяц
+    const oneMonthLater = new Date(today);
+    oneMonthLater.setMonth(today.getMonth() + 1);
+    
+    const calendarDays = [];
+    
+    // Получаем первую доступную дату (сегодня или позже)
+    const firstDate = new Date(availableDates[0]);
+    firstDate.setHours(0, 0, 0, 0);
+    
+    // Используем сегодня как начальную дату, если она раньше первой доступной
+    const startDate = firstDate < today ? new Date(today) : new Date(firstDate);
+    
+    // Используем дату через месяц как конечную, если она раньше последней доступной
+    const lastAvailableDate = new Date(availableDates[availableDates.length - 1]);
+    lastAvailableDate.setHours(0, 0, 0, 0);
+    const endDate = lastAvailableDate > oneMonthLater ? new Date(oneMonthLater) : new Date(lastAvailableDate);
+    
+    // Находим первый день недели (понедельник) для начальной даты
+    const calendarStartDate = new Date(startDate);
+    const dayOfWeek = calendarStartDate.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // 0 = воскресенье, 1 = понедельник
+    calendarStartDate.setDate(calendarStartDate.getDate() - daysToMonday);
+    
+    // Находим последний день недели (воскресенье) для конечной даты
+    const calendarEndDate = new Date(endDate);
+    const endDayOfWeek = calendarEndDate.getDay();
+    const daysToSunday = endDayOfWeek === 0 ? 0 : 7 - endDayOfWeek;
+    calendarEndDate.setDate(calendarEndDate.getDate() + daysToSunday);
+    
+    // Генерируем все дни календаря
+    const currentDate = new Date(calendarStartDate);
+    while (currentDate <= calendarEndDate) {
+      const dateStr = currentDate.toISOString().split("T")[0];
+      const isAvailable = availableDates.includes(dateStr);
+      const isPast = currentDate < today;
+      const isFuture = currentDate > oneMonthLater;
+      const isToday = dateStr === today.toISOString().split("T")[0];
+      
+      // Дата доступна только если она не в прошлом и не более чем через месяц
+      const canSelect = isAvailable && !isPast && !isFuture;
+      
+      calendarDays.push({
+        date: dateStr,
+        day: currentDate.getDate(),
+        dayOfWeek: currentDate.getDay(),
+        isAvailable: canSelect,
+        isToday: isToday,
+      });
+      
+      currentDate.setDate(currentDate.getDate() + 1);
     }
-    return dates;
+    
+    return calendarDays;
   };
 
   const formatTime = (time) => {
@@ -251,20 +332,41 @@ function App() {
       {step === 3 && (
         <div className="step-container">
           <h2>Выберите дату</h2>
-          <div className="date-grid">
-            {getAvailableDates().map((date) => (
-              <div
-                key={date}
-                className={`date-card ${selectedDate === date ? "selected" : ""}`}
-                onClick={() => handleDateSelect(date)}
-              >
-                <div className="date-day">{formatDate(date).split(",")[0]}</div>
-                <div className="date-weekday">
-                  {formatDate(date).split(",")[1]}
-                </div>
+          {getAvailableDates().length === 0 ? (
+            <div className="no-slots">
+              <p>Нет доступных дат для выбранного мастера</p>
+            </div>
+          ) : (
+            <div className="calendar-container">
+              <div className="calendar-header">
+                <div className="calendar-weekday">Пн</div>
+                <div className="calendar-weekday">Вт</div>
+                <div className="calendar-weekday">Ср</div>
+                <div className="calendar-weekday">Чт</div>
+                <div className="calendar-weekday">Пт</div>
+                <div className="calendar-weekday">Сб</div>
+                <div className="calendar-weekday">Вс</div>
               </div>
-            ))}
-          </div>
+              <div className="calendar-grid">
+                {getCalendarDays().map((day) => {
+                  return (
+                    <div
+                      key={day.date}
+                      className={`calendar-day ${
+                        !day.isAvailable ? "disabled" : ""
+                      } ${selectedDate === day.date ? "selected" : ""} ${
+                        day.isToday ? "today" : ""
+                      }`}
+                      onClick={() => day.isAvailable && handleDateSelect(day.date)}
+                    >
+                      <div className="calendar-day-number">{day.day}</div>
+                      {day.isToday && <div className="calendar-today-indicator">•</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

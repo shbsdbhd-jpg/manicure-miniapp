@@ -62,10 +62,16 @@ async def start(message: types.Message):
     user_id = message.from_user.id
     is_admin = database.is_admin(user_id)
     
-    # Используем постоянную клавиатуру (Reply Keyboard) - она всегда видна
-    reply_keyboard = create_reply_keyboard(is_admin)
+    # Используем inline кнопки (они всегда работают)
+    inline_keyboard = create_main_keyboard(is_admin)
     
-    # Также устанавливаем menu button для этого пользователя
+    # Также пробуем установить постоянную клавиатуру
+    try:
+        reply_keyboard = create_reply_keyboard(is_admin)
+    except:
+        reply_keyboard = None
+    
+    # Устанавливаем menu button для этого пользователя
     try:
         menu_button = MenuButtonWebApp(
             text="💅 Записаться",
@@ -75,11 +81,22 @@ async def start(message: types.Message):
     except Exception as e:
         print(f"Не удалось установить menu button для пользователя: {e}")
     
+    # Отправляем сообщение с inline кнопками (они точно работают)
     await message.answer(
         f"Привет, {message.from_user.first_name}! 👋\n\n"
         "💅 Нажмите кнопку ниже, чтобы записаться на маникюр:",
-        reply_markup=reply_keyboard  # Используем постоянную клавиатуру
+        reply_markup=inline_keyboard  # Используем inline кнопки
     )
+    
+    # Если постоянная клавиатура работает, отправляем её отдельным сообщением
+    if reply_keyboard:
+        try:
+            await message.answer(
+                "👇 Или используйте кнопку внизу экрана:",
+                reply_markup=reply_keyboard
+            )
+        except:
+            pass
 
 # Обработчик для любого текстового сообщения (кроме команд и web_app_data)
 # Этот обработчик должен быть последним, чтобы не перехватывать команды
@@ -99,14 +116,31 @@ async def handle_any_message(message: types.Message):
     except:
         pass
     
-    # Используем постоянную клавиатуру - она всегда видна
-    reply_keyboard = create_reply_keyboard(is_admin)
+    # Используем inline кнопки (они точно работают)
+    inline_keyboard = create_main_keyboard(is_admin)
     
+    # Также пробуем постоянную клавиатуру
+    try:
+        reply_keyboard = create_reply_keyboard(is_admin)
+    except:
+        reply_keyboard = None
+    
+    # Отправляем inline кнопки (они всегда работают)
     await message.answer(
         f"👋 Привет, {message.from_user.first_name}!\n\n"
         "💅 Нажмите кнопку ниже, чтобы записаться на маникюр:",
-        reply_markup=reply_keyboard  # Постоянная клавиатура всегда видна
+        reply_markup=inline_keyboard  # Inline кнопки всегда работают
     )
+    
+    # Если постоянная клавиатура работает, отправляем её
+    if reply_keyboard:
+        try:
+            await message.answer(
+                "👇 Или используйте кнопку внизу экрана:",
+                reply_markup=reply_keyboard
+            )
+        except:
+            pass
 
 # Команда /admin для добавления админа
 @dp.message(Command("admin"))
@@ -250,8 +284,11 @@ async def setup_bot_menu():
 
 # Асинхронный запуск
 async def main():
-    print("Бот запущен...")
+    print("🤖 Бот запущен...")
+    print("⏳ Настраиваю меню...")
     await setup_bot_menu()
+    print("✅ Бот готов к работе!")
+    print("💡 Отправьте /start боту, чтобы увидеть кнопки")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
