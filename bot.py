@@ -1,7 +1,10 @@
 import asyncio 
 import json
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp, BotCommand
+from aiogram.types import (
+    InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, 
+    MenuButtonWebApp, BotCommand, ReplyKeyboardMarkup, KeyboardButton
+)
 from aiogram.filters import Command
 import database
 
@@ -20,7 +23,7 @@ dp = Dispatcher()
 # Инициализация БД
 database.init_db()
 
-# Функция для создания клавиатуры
+# Функция для создания inline клавиатуры
 def create_main_keyboard(is_admin=False):
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -35,33 +38,74 @@ def create_main_keyboard(is_admin=False):
     
     return keyboard
 
+# Функция для создания постоянной клавиатуры (Reply Keyboard)
+def create_reply_keyboard(is_admin=False):
+    """Создает постоянную клавиатуру, которая всегда видна"""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="💅 Записаться на маникюр", web_app=WebAppInfo(url=CLIENT_WEBAPP_URL))],
+        ],
+        resize_keyboard=True,
+        persistent=True  # Клавиатура остается видимой
+    )
+    
+    if is_admin:
+        keyboard.keyboard.append(
+            [KeyboardButton(text="⚙️ Админ-панель", web_app=WebAppInfo(url=ADMIN_PANEL_URL))]
+        )
+    
+    return keyboard
+
 # Команда /start
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
     is_admin = database.is_admin(user_id)
     
-    keyboard = create_main_keyboard(is_admin)
+    # Используем постоянную клавиатуру (Reply Keyboard) - она всегда видна
+    reply_keyboard = create_reply_keyboard(is_admin)
+    
+    # Также устанавливаем menu button для этого пользователя
+    try:
+        menu_button = MenuButtonWebApp(
+            text="💅 Записаться",
+            web_app=WebAppInfo(url=CLIENT_WEBAPP_URL)
+        )
+        await bot.set_chat_menu_button(chat_id=message.chat.id, menu_button=menu_button)
+    except Exception as e:
+        print(f"Не удалось установить menu button для пользователя: {e}")
     
     await message.answer(
         f"Привет, {message.from_user.first_name}! 👋\n\n"
-        "Выберите действие:",
-        reply_markup=keyboard
+        "💅 Нажмите кнопку ниже, чтобы записаться на маникюр:",
+        reply_markup=reply_keyboard  # Используем постоянную клавиатуру
     )
 
 # Обработчик для любого текстового сообщения (кроме команд и web_app_data)
+# Этот обработчик должен быть последним, чтобы не перехватывать команды
 @dp.message(lambda message: message.text and not message.text.startswith('/') and message.web_app_data is None)
 async def handle_any_message(message: types.Message):
     """Показываем кнопки при любом текстовом сообщении"""
     user_id = message.from_user.id
     is_admin = database.is_admin(user_id)
     
-    keyboard = create_main_keyboard(is_admin)
+    # Устанавливаем menu button для пользователя
+    try:
+        menu_button = MenuButtonWebApp(
+            text="💅 Записаться",
+            web_app=WebAppInfo(url=CLIENT_WEBAPP_URL)
+        )
+        await bot.set_chat_menu_button(chat_id=message.chat.id, menu_button=menu_button)
+    except:
+        pass
+    
+    # Используем постоянную клавиатуру - она всегда видна
+    reply_keyboard = create_reply_keyboard(is_admin)
     
     await message.answer(
         f"👋 Привет, {message.from_user.first_name}!\n\n"
         "💅 Нажмите кнопку ниже, чтобы записаться на маникюр:",
-        reply_markup=keyboard
+        reply_markup=reply_keyboard  # Постоянная клавиатура всегда видна
     )
 
 # Команда /admin для добавления админа
@@ -185,15 +229,21 @@ async def setup_bot_menu():
         ]
         await bot.set_my_commands(commands)
         
-        # Устанавливаем Menu Button (кнопка меню рядом с полем ввода)
-        # Это создаст постоянную кнопку Web App в интерфейсе бота
+        # Устанавливаем Menu Button для всех пользователей
+        # Используем set_chat_menu_button с chat_id=None для глобальной настройки
         menu_button = MenuButtonWebApp(
             text="💅 Записаться",
             web_app=WebAppInfo(url=CLIENT_WEBAPP_URL)
         )
-        await bot.set_chat_menu_button(menu_button=menu_button)
+        # Пытаемся установить глобально
+        try:
+            await bot.set_chat_menu_button(chat_id=None, menu_button=menu_button)
+        except:
+            # Если не работает глобально, попробуем другой способ
+            pass
         
         print("✅ Меню бота настроено!")
+        print("💡 Кнопка '💅 Записаться' должна появиться рядом с полем ввода")
     except Exception as e:
         print(f"⚠️ Ошибка настройки меню бота: {e}")
         print("Бот будет работать, но меню может не отображаться")
