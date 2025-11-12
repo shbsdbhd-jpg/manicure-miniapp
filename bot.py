@@ -1,7 +1,9 @@
 import asyncio 
 import json
 import logging
+import os
 from datetime import datetime
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, 
@@ -9,6 +11,9 @@ from aiogram.types import (
 )
 from aiogram.filters import Command
 import database
+
+# Загружаем переменные окружения из .env файла
+load_dotenv()
 
 # Настройка логирования
 logging.basicConfig(
@@ -25,8 +30,14 @@ logger = logging.getLogger(__name__)
 aiogram_logger = logging.getLogger('aiogram')
 aiogram_logger.setLevel(logging.INFO)
 
-# Токен твоего бота
-TOKEN = ""
+# Токен твоего бота (читается из переменной окружения)
+TOKEN = os.getenv("BOT_TOKEN", "")
+if not TOKEN:
+    print("❌ ОШИБКА: BOT_TOKEN не найден!")
+    print("📝 Создайте файл .env в корне проекта и добавьте:")
+    print("   BOT_TOKEN=ваш_токен_здесь")
+    print("💡 Скопируйте .env.example в .env и заполните токен")
+    raise ValueError("BOT_TOKEN не установлен. Создайте файл .env с токеном бота.")
 
 # Ссылки на Mini App (ngrok HTTPS или хостинг)
 # ⚠️ ЗАМЕНИТЕ на ваш домен!
