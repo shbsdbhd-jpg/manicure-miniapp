@@ -98,10 +98,29 @@ async def start(message: types.Message):
         except:
             pass
 
+# Отладочный обработчик - ловим все сообщения
+@dp.message()
+async def debug_all_messages(message: types.Message):
+    """Отладочный обработчик всех сообщений"""
+    # Логируем все сообщения для отладки
+    if message.web_app_data:
+        print(f"🔍 ОТЛАДКА: Найдено web_app_data!")
+        print(f"   Пользователь: {message.from_user.id}")
+        print(f"   Данные: {message.web_app_data.data}")
+        # Вызываем основной обработчик
+        await handle_web_app(message)
+        return
+    
+    # Если это команда, пропускаем (команды обрабатываются отдельно через фильтры)
+    if message.text and message.text.startswith('/'):
+        return
+    
+    # Обычные текстовые сообщения
+    if message.text:
+        await handle_any_message_text(message)
+
 # Обработчик для любого текстового сообщения (кроме команд и web_app_data)
-# Этот обработчик должен быть последним, чтобы не перехватывать команды
-@dp.message(lambda message: message.text and not message.text.startswith('/') and message.web_app_data is None)
-async def handle_any_message(message: types.Message):
+async def handle_any_message_text(message: types.Message):
     """Показываем кнопки при любом текстовом сообщении"""
     user_id = message.from_user.id
     is_admin = database.is_admin(user_id)
@@ -305,6 +324,44 @@ async def test_command(message: types.Message):
     """Тестовая команда"""
     await message.answer("✅ Бот работает! Команды обрабатываются.")
 
+# Команда для ручного создания записи (для тестирования)
+@dp.message(Command("add_booking"))
+async def add_booking_command(message: types.Message):
+    """Ручное создание записи для тестирования"""
+    user_id = message.from_user.id
+    
+    # Создаем тестовую запись
+    try:
+        from datetime import datetime, timedelta
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+        
+        booking_id = database.add_booking(
+            user_id=user_id,
+            username=message.from_user.username or "",
+            first_name=message.from_user.first_name or "Тестовый",
+            phone="+7 (999) 123-45-67",
+            service="Классический маникюр",
+            master="Анна",
+            date=tomorrow,
+            time_slot="10:00"
+        )
+        
+        await message.answer(
+            f"✅ Тестовая запись создана!\n\n"
+            f"📅 Дата: {tomorrow}\n"
+            f"⏰ Время: 10:00\n"
+            f"💅 Услуга: Классический маникюр\n"
+            f"👩‍🎨 Мастер: Анна\n\n"
+            f"ID записи: {booking_id}\n\n"
+            f"Теперь попробуйте команду /allbookings"
+        )
+        print(f"✅ Тестовая запись создана с ID: {booking_id}")
+    except Exception as e:
+        print(f"❌ Ошибка создания тестовой записи: {e}")
+        import traceback
+        traceback.print_exc()
+        await message.answer(f"❌ Ошибка: {str(e)}")
+
 # Команда для просмотра всех записей (только для админов)
 @dp.message(Command("all_bookings", "allbookings"))
 async def all_bookings_command(message: types.Message):
@@ -448,7 +505,15 @@ async def handle_web_app(message: types.Message):
     try:
         print(f"📨 Получены данные из Mini App от пользователя {message.from_user.id}")
         print(f"Имя: {message.from_user.first_name}, Username: {message.from_user.username}")
-        print(f"Данные: {message.web_app_data.data}")
+        print(f"Тип сообщения: {type(message)}")
+        print(f"web_app_data: {message.web_app_data}")
+        if message.web_app_data:
+            print(f"Данные: {message.web_app_data.data}")
+        
+        if not message.web_app_data or not message.web_app_data.data:
+            print("⚠️ web_app_data пуст или отсутствует")
+            await message.answer("⚠️ Данные из Mini App не получены. Попробуйте создать запись еще раз.")
+            return
         
         data = json.loads(message.web_app_data.data)
         print(f"Распарсенные данные: {data}")
