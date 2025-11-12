@@ -86,7 +86,12 @@ function App() {
 
   const handleSubmit = async () => {
     if (!selectedService || !selectedMaster || !selectedDate || !selectedTime) {
-      alert("Пожалуйста, заполните все поля");
+      window.alert("Пожалуйста, заполните все поля");
+      return;
+    }
+
+    if (!phone || phone.trim() === "") {
+      window.alert("Пожалуйста, укажите номер телефона");
       return;
     }
 
@@ -112,24 +117,34 @@ function App() {
 
       if (response.ok) {
         // Затем отправляем в Telegram
-        tg?.sendData(
-          JSON.stringify({
-            type: "booking",
-            service: selectedService.name,
-            master: selectedMaster.name,
-            date: selectedDate,
-            time_slot: selectedTime,
-            phone: phone,
-          })
-        );
+        const bookingData = {
+          type: "booking",
+          service: selectedService.name,
+          master: selectedMaster.name,
+          date: selectedDate,
+          time_slot: selectedTime,
+          phone: phone,
+        };
+
+        try {
+          if (tg && tg.sendData) {
+            tg.sendData(JSON.stringify(bookingData));
+          } else {
+            console.warn("Telegram WebApp API not available");
+          }
+        } catch (telegramError) {
+          console.error("Error sending data to Telegram:", telegramError);
+          // Продолжаем даже если не удалось отправить в Telegram
+        }
+
         setStep(6); // Шаг успешной записи
       } else {
         const error = await response.json();
-        alert(`Ошибка: ${error.error || "Не удалось создать запись"}`);
+        window.alert(`Ошибка: ${error.error || "Не удалось создать запись"}`);
       }
     } catch (error) {
       console.error("Error creating booking:", error);
-      alert("Произошла ошибка при создании записи");
+      window.alert("Произошла ошибка при создании записи. Попробуйте еще раз.");
     } finally {
       setLoading(false);
     }
@@ -317,19 +332,23 @@ function App() {
               <span className="detail-label">Время:</span>
               <span className="detail-value">{selectedTime}</span>
             </div>
-            {phone && (
-              <div className="detail-item">
-                <span className="detail-label">Телефон:</span>
-                <span className="detail-value">{phone}</span>
-              </div>
-            )}
+            <div className="detail-item">
+              <span className="detail-label">Телефон:</span>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+7 (999) 123-45-67"
+                className="phone-input"
+              />
+            </div>
           </div>
           <button
             className="btn-primary submit-button"
             onClick={handleSubmit}
             disabled={loading}
           >
-            {loading ? "Отправка..." : "Подтвердить запись"}
+            {loading ? "⏳ Отправка..." : "✅ Подтвердить запись"}
           </button>
         </div>
       )}
