@@ -1,12 +1,22 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import AdminPanel from './AdminPanel';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
+
+// Простая маршрутизация на основе пути
+const path = window.location.pathname;
+let Component = App;
+
+if (path.includes('/admin')) {
+  Component = AdminPanel;
+}
+
 root.render(
   <React.StrictMode>
-    <App />
+    <Component />
   </React.StrictMode>
 );
 
