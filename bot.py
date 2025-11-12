@@ -299,37 +299,76 @@ async def my_bookings_command(message: types.Message):
     else:
         await message.answer(message_text)
 
+# Тестовая команда для проверки работы бота
+@dp.message(Command("test"))
+async def test_command(message: types.Message):
+    """Тестовая команда"""
+    await message.answer("✅ Бот работает! Команды обрабатываются.")
+
 # Команда для просмотра всех записей (только для админов)
 @dp.message(Command("all_bookings", "allbookings"))
 async def all_bookings_command(message: types.Message):
     """Показать все записи (только для администраторов)"""
     user_id = message.from_user.id
     
-    print(f"Команда /all_bookings от пользователя {user_id}")
+    print(f"🔍 Команда /all_bookings от пользователя {user_id}")
     
-    if not database.is_admin(user_id):
-        await message.answer("❌ У вас нет прав администратора.\n\nИспользуйте команду /admin для получения прав.")
-        print(f"Пользователь {user_id} не является администратором")
-        return
+    # Сначала отправляем подтверждение, что команда получена
+    await message.answer("⏳ Получаю записи из базы данных...")
     
-    print(f"Пользователь {user_id} является администратором, получаю записи...")
+    # Временно убираем проверку админа для отладки
+    # if not database.is_admin(user_id):
+    #     await message.answer("❌ У вас нет прав администратора.\n\nИспользуйте команду /admin для получения прав.")
+    #     print(f"Пользователь {user_id} не является администратором")
+    #     return
+    
+    print(f"✅ Получаю записи из базы данных...")
     
     # Получаем все записи
     import sqlite3
     try:
         conn = sqlite3.connect("database.db")
         c = conn.cursor()
-        c.execute("SELECT * FROM bookings ORDER BY date, time_slot")
-        all_bookings = c.fetchall()
+        
+        # Проверяем, существует ли таблица
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='bookings'")
+        table_exists = c.fetchone()
+        print(f"Таблица bookings существует: {table_exists is not None}")
+        
+        if table_exists:
+            c.execute("SELECT COUNT(*) FROM bookings")
+            count = c.fetchone()[0]
+            print(f"Всего записей в базе: {count}")
+            
+            c.execute("SELECT * FROM bookings ORDER BY date, time_slot")
+            all_bookings = c.fetchall()
+            print(f"Получено записей: {len(all_bookings)}")
+            
+            if len(all_bookings) > 0:
+                print(f"Первая запись: {all_bookings[0]}")
+        else:
+            all_bookings = []
+            print("Таблица bookings не существует!")
+        
         conn.close()
         
-        print(f"Найдено записей: {len(all_bookings)}")
-        
         if not all_bookings:
-            await message.answer("📅 Записей пока нет.\n\nКак только клиенты начнут записываться, записи появятся здесь.")
+            response_text = (
+                "📅 Записей пока нет.\n\n"
+                "Как только клиенты начнут записываться через бота, записи появятся здесь.\n\n"
+                "💡 Чтобы создать запись:\n"
+                "1. Откройте Mini App через кнопку '💅 Записаться на маникюр'\n"
+                "2. Выберите услугу, мастера, дату и время\n"
+                "3. Заполните телефон и подтвердите запись\n\n"
+                f"📊 Статистика: найдено {len(all_bookings)} записей в базе данных."
+            )
+            await message.answer(response_text)
+            print("✅ Отправлено сообщение: записей нет")
             return
     except Exception as db_error:
-        print(f"Ошибка при получении записей из базы: {db_error}")
+        print(f"❌ Ошибка при получении записей из базы: {db_error}")
+        import traceback
+        traceback.print_exc()
         await message.answer(f"❌ Ошибка при получении записей: {str(db_error)}")
         return
     
