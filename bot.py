@@ -26,7 +26,7 @@ aiogram_logger = logging.getLogger('aiogram')
 aiogram_logger.setLevel(logging.INFO)
 
 # Токен твоего бота
-TOKEN = "8548031527:AAFPbXMfwauEkhElFKKyC_lnzItmuVFPLrc"
+TOKEN = ""
 
 # Ссылки на Mini App (ngrok HTTPS или хостинг)
 # ⚠️ ЗАМЕНИТЕ на ваш домен!
