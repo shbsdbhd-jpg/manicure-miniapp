@@ -32,6 +32,7 @@ Thumbs.db
 
 # Logs
 *.log
+bot.log
 
 # Calendar credentials
 credentials.json

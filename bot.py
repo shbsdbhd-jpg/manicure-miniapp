@@ -1,5 +1,7 @@
 import asyncio 
 import json
+import logging
+from datetime import datetime
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, 
@@ -7,6 +9,17 @@ from aiogram.types import (
 )
 from aiogram.filters import Command
 import database
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('bot.log', encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Токен твоего бота
 TOKEN = "8548031527:AAFPbXMfwauEkhElFKKyC_lnzItmuVFPLrc"
@@ -79,7 +92,7 @@ async def start(message: types.Message):
         )
         await bot.set_chat_menu_button(chat_id=message.chat.id, menu_button=menu_button)
     except Exception as e:
-        print(f"Не удалось установить menu button для пользователя: {e}")
+        logger.warning(f"Не удалось установить menu button для пользователя: {e}")
     
     # Отправляем сообщение с inline кнопками (они точно работают)
     await message.answer(
@@ -104,9 +117,9 @@ async def debug_all_messages(message: types.Message):
     """Отладочный обработчик всех сообщений"""
     # Логируем все сообщения для отладки
     if message.web_app_data:
-        print(f"🔍 ОТЛАДКА: Найдено web_app_data!")
-        print(f"   Пользователь: {message.from_user.id}")
-        print(f"   Данные: {message.web_app_data.data}")
+        logger.debug(f"🔍 ОТЛАДКА: Найдено web_app_data!")
+        logger.debug(f"   Пользователь: {message.from_user.id}")
+        logger.debug(f"   Данные: {message.web_app_data.data}")
         # Вызываем основной обработчик
         await handle_web_app(message)
         return
@@ -355,11 +368,9 @@ async def add_booking_command(message: types.Message):
             f"ID записи: {booking_id}\n\n"
             f"Теперь попробуйте команду /allbookings"
         )
-        print(f"✅ Тестовая запись создана с ID: {booking_id}")
+        logger.info(f"✅ Тестовая запись создана с ID: {booking_id}")
     except Exception as e:
-        print(f"❌ Ошибка создания тестовой записи: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"❌ Ошибка создания тестовой записи: {e}", exc_info=True)
         await message.answer(f"❌ Ошибка: {str(e)}")
 
 # Команда для просмотра всех записей (только для админов)
@@ -368,7 +379,7 @@ async def all_bookings_command(message: types.Message):
     """Показать все записи (только для администраторов)"""
     user_id = message.from_user.id
     
-    print(f"🔍 Команда /all_bookings от пользователя {user_id}")
+    logger.info(f"🔍 Команда /all_bookings от пользователя {user_id}")
     
     # Сначала отправляем подтверждение, что команда получена
     await message.answer("⏳ Получаю записи из базы данных...")
@@ -376,10 +387,10 @@ async def all_bookings_command(message: types.Message):
     # Временно убираем проверку админа для отладки
     # if not database.is_admin(user_id):
     #     await message.answer("❌ У вас нет прав администратора.\n\nИспользуйте команду /admin для получения прав.")
-    #     print(f"Пользователь {user_id} не является администратором")
+    #     logger.warning(f"Пользователь {user_id} не является администратором")
     #     return
     
-    print(f"✅ Получаю записи из базы данных...")
+    logger.info(f"✅ Получаю записи из базы данных...")
     
     # Получаем все записи
     import sqlite3
@@ -390,22 +401,22 @@ async def all_bookings_command(message: types.Message):
         # Проверяем, существует ли таблица
         c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='bookings'")
         table_exists = c.fetchone()
-        print(f"Таблица bookings существует: {table_exists is not None}")
+        logger.info(f"Таблица bookings существует: {table_exists is not None}")
         
         if table_exists:
             c.execute("SELECT COUNT(*) FROM bookings")
             count = c.fetchone()[0]
-            print(f"Всего записей в базе: {count}")
+            logger.info(f"Всего записей в базе: {count}")
             
             c.execute("SELECT * FROM bookings ORDER BY date, time_slot")
             all_bookings = c.fetchall()
-            print(f"Получено записей: {len(all_bookings)}")
+            logger.info(f"Получено записей: {len(all_bookings)}")
             
             if len(all_bookings) > 0:
-                print(f"Первая запись: {all_bookings[0]}")
+                logger.debug(f"Первая запись: {all_bookings[0]}")
         else:
             all_bookings = []
-            print("Таблица bookings не существует!")
+            logger.warning("Таблица bookings не существует!")
         
         conn.close()
         
@@ -420,12 +431,10 @@ async def all_bookings_command(message: types.Message):
                 f"📊 Статистика: найдено {len(all_bookings)} записей в базе данных."
             )
             await message.answer(response_text)
-            print("✅ Отправлено сообщение: записей нет")
+            logger.info("✅ Отправлено сообщение: записей нет")
             return
     except Exception as db_error:
-        print(f"❌ Ошибка при получении записей из базы: {db_error}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"❌ Ошибка при получении записей из базы: {db_error}", exc_info=True)
         await message.answer(f"❌ Ошибка при получении записей: {str(db_error)}")
         return
     
@@ -485,7 +494,7 @@ async def all_bookings_command(message: types.Message):
             if current_part:
                 parts.append(current_part)
             
-            print(f"Сообщение разбито на {len(parts)} частей")
+            logger.info(f"Сообщение разбито на {len(parts)} частей")
             
             for i, part in enumerate(parts):
                 if i == 0:
@@ -493,34 +502,34 @@ async def all_bookings_command(message: types.Message):
                 else:
                     await message.answer(f"📋 Продолжение ({i+1}/{len(parts)}):\n\n{part}")
         else:
-            print(f"Отправляю сообщение длиной {len(message_text)} символов")
+            logger.info(f"Отправляю сообщение длиной {len(message_text)} символов")
             await message.answer(message_text)
     except Exception as send_error:
-        print(f"Ошибка при отправке сообщения: {send_error}")
+        logger.error(f"Ошибка при отправке сообщения: {send_error}", exc_info=True)
         await message.answer(f"❌ Ошибка при отправке записей: {str(send_error)}")
 
 # Получаем данные из Mini App (клиент)
 @dp.message(lambda message: message.web_app_data is not None)
 async def handle_web_app(message: types.Message):
     try:
-        print(f"📨 Получены данные из Mini App от пользователя {message.from_user.id}")
-        print(f"Имя: {message.from_user.first_name}, Username: {message.from_user.username}")
-        print(f"Тип сообщения: {type(message)}")
-        print(f"web_app_data: {message.web_app_data}")
+        logger.info(f"📨 Получены данные из Mini App от пользователя {message.from_user.id}")
+        logger.info(f"Имя: {message.from_user.first_name}, Username: {message.from_user.username}")
+        logger.debug(f"Тип сообщения: {type(message)}")
+        logger.debug(f"web_app_data: {message.web_app_data}")
         if message.web_app_data:
-            print(f"Данные: {message.web_app_data.data}")
+            logger.debug(f"Данные: {message.web_app_data.data}")
         
         if not message.web_app_data or not message.web_app_data.data:
-            print("⚠️ web_app_data пуст или отсутствует")
+            logger.warning("⚠️ web_app_data пуст или отсутствует")
             await message.answer("⚠️ Данные из Mini App не получены. Попробуйте создать запись еще раз.")
             return
         
         data = json.loads(message.web_app_data.data)
-        print(f"Распарсенные данные: {data}")
+        logger.info(f"Распарсенные данные: {data}")
         
         if data.get('type') == 'booking':
-            print(f"📝 Создаю запись в базе данных...")
-            print(f"Мастер: {data.get('master')}, Дата: {data.get('date')}, Время: {data.get('time_slot')}")
+            logger.info(f"📝 Создаю запись в базе данных...")
+            logger.info(f"Мастер: {data.get('master')}, Дата: {data.get('date')}, Время: {data.get('time_slot')}")
             
             # Создание записи
             try:
@@ -534,12 +543,10 @@ async def handle_web_app(message: types.Message):
                     date=data['date'],
                     time_slot=data['time_slot']
                 )
-                print(f"✅ Запись успешно сохранена в базу данных с ID: {booking_id}")
-                print(f"Теперь в базе есть запись для мастера '{data['master']}' на {data['date']} в {data['time_slot']}")
+                logger.info(f"✅ Запись успешно сохранена в базу данных с ID: {booking_id}")
+                logger.info(f"Теперь в базе есть запись для мастера '{data['master']}' на {data['date']} в {data['time_slot']}")
             except Exception as booking_error:
-                print(f"❌ Ошибка при сохранении записи: {booking_error}")
-                import traceback
-                traceback.print_exc()
+                logger.error(f"❌ Ошибка при сохранении записи: {booking_error}", exc_info=True)
                 await message.answer(f"❌ Ошибка при сохранении записи: {str(booking_error)}")
                 return
             
@@ -569,9 +576,9 @@ async def handle_web_app(message: types.Message):
                     await bot.send_message(master_chat_id, master_message)
                 else:
                     # Если мастер не зарегистрирован, отправляем сообщение в консоль
-                    print(f"⚠️ Мастер {data['master']} не зарегистрирован. Используйте /register_master")
+                    logger.warning(f"⚠️ Мастер {data['master']} не зарегистрирован. Используйте /register_master")
             except Exception as master_error:
-                print(f"Ошибка отправки сообщения мастеру: {master_error}")
+                logger.error(f"Ошибка отправки сообщения мастеру: {master_error}", exc_info=True)
                 # Продолжаем работу даже если не удалось отправить мастеру
             
         
@@ -612,19 +619,19 @@ async def setup_bot_menu():
             # Если не работает глобально, попробуем другой способ
             pass
         
-        print("✅ Меню бота настроено!")
-        print("💡 Кнопка '💅 Записаться' должна появиться рядом с полем ввода")
+        logger.info("✅ Меню бота настроено!")
+        logger.info("💡 Кнопка '💅 Записаться' должна появиться рядом с полем ввода")
     except Exception as e:
-        print(f"⚠️ Ошибка настройки меню бота: {e}")
-        print("Бот будет работать, но меню может не отображаться")
+        logger.warning(f"⚠️ Ошибка настройки меню бота: {e}")
+        logger.warning("Бот будет работать, но меню может не отображаться")
 
 # Асинхронный запуск
 async def main():
-    print("🤖 Бот запущен...")
-    print("⏳ Настраиваю меню...")
+    logger.info("🤖 Бот запущен...")
+    logger.info("⏳ Настраиваю меню...")
     await setup_bot_menu()
-    print("✅ Бот готов к работе!")
-    print("💡 Отправьте /start боту, чтобы увидеть кнопки")
+    logger.info("✅ Бот готов к работе!")
+    logger.info("💡 Отправьте /start боту, чтобы увидеть кнопки")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
